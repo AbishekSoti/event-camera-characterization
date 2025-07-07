@@ -8,25 +8,46 @@ import matplotlib.pyplot as plt
 def load_events(path):
     """
     Load event stream from a .raw file.
+    Then convert it to an array using Faery's under the hood decoder object.
+    This stores values in decoder in the format of t,x,y,on which can be
+    referenced via decoder["t"],decoder["on"] and such.
     """
     decoder = events_stream_from_file(path)
     return decoder.to_array()
 
+#TODO: Implement a frequency estimator in cause frequency is not known.
 
-def estimate_frequency(events, max_time=None):
-    """
-    Estimate dominant event frequency using ON/OFF transitions.
-    """
-    t = events["t"]
-    p = events["on"]
-    if max_time:
-        t, p = t[t < max_time], p[t < max_time]
-
-    changes = np.flatnonzero(np.diff(p.astype(int)))
-    intervals = np.diff(t[changes])
-    median_period = np.median(intervals)
-    return 1e6 / median_period if median_period > 0 else 1.0
-
+# def estimate_frequency_fft(events, bin_size_us=1000, max_time_us=None, plot=False):
+#     t = events["t"]
+#
+#     if max_time_us:
+#         t = t[t < max_time_us]
+#
+#     if len(t) < 2:
+#         print("Warning: Not enough events for frequency estimation.")
+#         return 1.0
+#
+#     duration_us = t[-1] - t[0]
+#     num_bins = max(1, int(duration_us // bin_size_us))  # avoid zero bins
+#
+#     hist, _ = np.histogram(t, bins=num_bins)
+#     rate = hist.astype(float)
+#
+#     rate -= np.mean(rate)
+#
+#     fft_vals = np.fft.fft(rate)
+#     freqs = np.fft.fftfreq(len(rate), d=bin_size_us * 1e-6)
+#
+#     pos_freqs = freqs[freqs > 0]
+#     magnitude = np.abs(fft_vals[freqs > 0])
+#
+#     if len(magnitude) == 0:
+#         print("Warning: FFT returned no valid frequency components.")
+#         return 1.0
+#
+#     dominant_idx = np.argmax(magnitude)
+#     return pos_freqs[dominant_idx]
+#
 
 def find_clean_start(events, T):
     """
@@ -96,13 +117,14 @@ def plot_mega_wave(mega_wave, T, bins=200):
     plt.tight_layout()
     plt.show()
 
-def analyse(path, freq=None):
+def analyse(path, freq, verbose=True):
     """
     Load events, extract full cycles, and fold into a single mega-wave.
 
     Parameters:
         path (str): Path to the raw event file.
-        freq (float, optional): Frequency in Hz. If None, it will be estimated.
+        freq (float): Frequency in Hz (required).
+        verbose (bool): Whether to print diagnostic information.
 
     Returns:
         tuple: (mega_wave_dict, T, freq)
@@ -110,13 +132,29 @@ def analyse(path, freq=None):
             - T: period in microseconds
             - freq: frequency used in analysis
     """
+    if freq is None:
+        raise ValueError("Frequency must be provided.")
+
+    if verbose:
+        print("[INFO] Loading events...")
+
     events = load_events(path)
 
-    if freq is None:
-        freq = estimate_frequency(events)
-
     T = int(1e6 / freq)
+
+    if verbose:
+        print(f"[INFO] Using frequency: {freq:.2f} Hz (Period T = {T} µs)")
+        print("[INFO] Extracting full cycles...")
+
     cycles = extract_full_cycles(events, freq)
+
+    if verbose:
+        print(f"[INFO] Extracted {len(cycles)} cycles")
+        print("[INFO] Folding events...")
+
     mega_wave = fold_events(cycles, T)
+
+    if verbose:
+        print("[INFO] Done.")
 
     return mega_wave, T, freq

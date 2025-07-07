@@ -8,4 +8,4 @@ from main import *
 
 
 # All that gets replaced by using the analyse function that returns mega_wave,T,freq.
-mega_wave, T, freq = analyse("recordings/recording_2025-03-26_13-41-19.raw", freq=5.5)
+mega_wave, T, freq = analyse("recordings/recording_2025-03-26_13-41-19.raw", freq = 5.5)
