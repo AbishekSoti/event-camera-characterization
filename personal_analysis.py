@@ -1,6 +1,6 @@
 from main import *
 # events = load_events("recordings/recording_2025-03-26_13-41-19.raw")
-# freq = 5.5  # or use: freq = estimate_frequency(events)
+# freq = 5.5  # Implement frequency analyser in the future.
 # cycles = extract_full_cycles(events, freq)
 # T = int(1e6 / freq)
 # mega_wave = fold_events(cycles, T)
