@@ -2,71 +2,51 @@ from faery.events_input import events_stream_from_file
 import numpy as np
 import matplotlib.pyplot as plt
 
-#Remember, all files must be saved in the recordings directory that is at the same level as other codes and venv and external libraries.
+
+# Remember, all files must be saved in the recordings directory that is at the same level as other codes and venv and external libraries.
 # Always pip install faery to use this code.
 
 def load_events(path):
     """
     Load event stream from a .raw file.
-    Then convert it to an array using Faery's under the hood decoder object.
+    Then convert it to an array using Faery's under-the-hood decoder object.
     This stores values in decoder in the format of t,x,y,on which can be
-    referenced via decoder["t"],decoder["on"] and such.
+    referenced via decoder["t"], decoder["on"], and so on.
     """
     decoder = events_stream_from_file(path)
     return decoder.to_array()
 
-#TODO: Implement a frequency estimator in cause frequency is not known.
 
-# def estimate_frequency_fft(events, bin_size_us=1000, max_time_us=None, plot=False):
-#     t = events["t"]
-#
-#     if max_time_us:
-#         t = t[t < max_time_us]
-#
-#     if len(t) < 2:
-#         print("Warning: Not enough events for frequency estimation.")
-#         return 1.0
-#
-#     duration_us = t[-1] - t[0]
-#     num_bins = max(1, int(duration_us // bin_size_us))  # avoid zero bins
-#
-#     hist, _ = np.histogram(t, bins=num_bins)
-#     rate = hist.astype(float)
-#
-#     rate -= np.mean(rate)
-#
-#     fft_vals = np.fft.fft(rate)
-#     freqs = np.fft.fftfreq(len(rate), d=bin_size_us * 1e-6)
-#
-#     pos_freqs = freqs[freqs > 0]
-#     magnitude = np.abs(fft_vals[freqs > 0])
-#
-#     if len(magnitude) == 0:
-#         print("Warning: FFT returned no valid frequency components.")
-#         return 1.0
-#
-#     dominant_idx = np.argmax(magnitude)
-#     return pos_freqs[dominant_idx]
-#
-
-def find_clean_start(events, T):
+def find_clean_start(events, T, verbose=False):
     """
     Find stable 3x ON or OFF sequence within half a period to set t0.
     """
     t, p = events["t"], events["on"]
     for i in range(2, len(p)):
-        if p[i] == p[i-1] == p[i-2] and (t[i] - t[i-2]) < (T // 2):
-            return t[i]
-    return t[0]  # fallback
+        if p[i] == p[i - 1] == p[i - 2] and (t[i] - t[i - 2]) < (T // 2):
+            t0 = t[i]
+            if verbose:
+                print(f"[DEBUG] Found clean start at t = {t0 / 1e6:.6f} s, polarity = {p[i]}")
+            return t0
+    if verbose:
+        print(f"[DEBUG] No clean start found, falling back to t[0] = {t[0] / 1e6:.6f} s")
+    return t[0]
 
 
-def extract_full_cycles(events, freq):
+def extract_full_cycles(events, T, verbose=False):
     """
     Drop partial cycles and extract full periods using a stable starting point.
+
+    Parameters:
+        events: np.ndarray of events
+        T: Period in microseconds
+        verbose: Print debug information
+
+    Returns:
+        List of full cycles (each a structured array of events)
     """
-    T = int(1e6 / freq)  # µs
     t = events["t"]
-    t0 = find_clean_start(events, T)
+    t0 = find_clean_start(events, T, verbose=verbose)
     t_end = t[-1]
     cycles = []
 
@@ -81,6 +61,13 @@ def extract_full_cycles(events, freq):
 def fold_events(cycles, T):
     """
     Fold events from multiple full cycles into a single reference period.
+
+    Parameters:
+        cycles: List of full cycles
+        T: Period in microseconds
+
+    Returns:
+        Dict containing concatenated folded arrays ('t', 'x', 'y', 'on')
     """
     mega_t, mega_x, mega_y, mega_on = [], [], [], []
 
@@ -98,7 +85,7 @@ def fold_events(cycles, T):
         "on": np.concatenate(mega_on)
     }
 
-# Ignore plots for now.
+
 def plot_mega_wave(mega_wave, T, bins=200):
     """
     Plot histogram of ON and OFF events over one folded cycle.
@@ -116,6 +103,7 @@ def plot_mega_wave(mega_wave, T, bins=200):
     plt.grid(True)
     plt.tight_layout()
     plt.show()
+
 
 def analyse(path, freq, verbose=True):
     """
@@ -140,13 +128,16 @@ def analyse(path, freq, verbose=True):
 
     events = load_events(path)
 
+    if verbose:
+        print(f"[DEBUG] Recording starts at {events['t'][0] / 1e6:.6f} s, ends at {events['t'][-1] / 1e6:.6f} s")
+
     T = int(1e6 / freq)
 
     if verbose:
         print(f"[INFO] Using frequency: {freq:.2f} Hz (Period T = {T} µs)")
         print("[INFO] Extracting full cycles...")
 
-    cycles = extract_full_cycles(events, freq)
+    cycles = extract_full_cycles(events, T, verbose=verbose)
 
     if verbose:
         print(f"[INFO] Extracted {len(cycles)} cycles")
