@@ -4,6 +4,6 @@ Please do:
 pip install -r requirements.txt
 to install all required files.
 Make sure to have a folder named 'recordings' to save all your
-recordings.\n
+recordings.
 when you use the analyse function, you can set to verbose = False
 to not get printouts.
