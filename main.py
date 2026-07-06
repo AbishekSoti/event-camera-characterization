@@ -1,4 +1,4 @@
-ffrom pathlib import Path
+from pathlib import Path
 import numpy as np
 import matplotlib.pyplot as plt
 from faery.events_input import events_stream_from_file
@@ -241,9 +241,12 @@ events, cycles, mega_wave, T = analyse_event_file(
 
 
 # To access folded columns:
-mega_wave["t"]
-mega_wave["x"]
-mega_wave["y"]
-mega_wave["on"]
+print(
+mega_wave["t"],
+mega_wave["x"],
+mega_wave["y"],
+mega_wave["on"])
+
+
 
 
